@@ -677,6 +677,12 @@ class DeviceSpecificParams(object):
     used to install the image for the device's baseband processor."""
     return self._DoCall("FullOTA_InstallEnd")
 
+  def FullOTA_WriteBootimg(self):
+    """Called after emitting the block of assertions at the top of a
+    full OTA package.  Implementations can add whatever additional
+    assertions they like."""
+    return self._DoCall("FullOTA_WriteBootimg")
+
   def IncrementalOTA_Assertions(self):
     """Called after emitting the block of assertions at the top of an
     incremental OTA package.  Implementations can add whatever

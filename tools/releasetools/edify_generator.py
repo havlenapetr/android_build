@@ -157,12 +157,20 @@ class EdifyGenerator(object):
     destination directory."""
     self.script.append('package_extract_dir("%s", "%s");' % (src, dst))
 
+  def UnpackPackageFile(self, src, dst):
+    """Unpack a given file from the OTA package into the given
+    destination file."""
+    self.script.append('package_extract_file("%s", "%s");' % (src, dst))
+
   def Comment(self, comment):
     """Write a comment into the update script."""
     self.script.append("")
     for i in comment.split("\n"):
       self.script.append("# " + i)
     self.script.append("")
+
+  def RunProgram(self, program):
+    self.script.append('assert(run_program("%s") == 0);' % program)
 
   def Print(self, message):
     """Log a message to the screen (if the logs are visible)."""
