@@ -85,6 +85,17 @@ class EdifyGenerator(object):
     self.script.append(('assert(!less_than_int(%s, '
                         'getprop("ro.build.date.utc")));') % (timestamp,))
 
+  def AssertDevices(self, devices):
+    """Assert that the devices identifier is the given strings."""
+    cmd = 'assert('
+    for index, device in enumerate(devices):
+      cmd += ('getprop("ro.product.device") == "%s" ||\0'
+              'getprop("ro.build.product") == "%s"' % (device, device))
+      if index + 1 < len(devices):
+        cmd += ' ||\0'
+    cmd += ');'
+    self.script.append(self._WordWrap(cmd))
+
   def AssertDevice(self, device):
     """Assert that the device identifier is the given string."""
     cmd = ('assert(getprop("ro.product.device") == "%s" ||\0'
@@ -146,12 +157,24 @@ class EdifyGenerator(object):
     destination directory."""
     self.script.append('package_extract_dir("%s", "%s");' % (src, dst))
 
+  def UnpackPackageFile(self, src, dst):
+    """Unpack a given file from the OTA package into the given
+    destination file."""
+    self.script.append('package_extract_file("%s", "%s");' % (src, dst))
+
   def Comment(self, comment):
     """Write a comment into the update script."""
     self.script.append("")
     for i in comment.split("\n"):
       self.script.append("# " + i)
     self.script.append("")
+
+  def RunProgram(self, program, args):
+    cmd = 'assert(run_program("%s"' % program
+    for arg in args:
+      cmd += ', "%s"' % arg
+    cmd += ') == 0);'
+    self.script.append(cmd)
 
   def Print(self, message):
     """Log a message to the screen (if the logs are visible)."""
@@ -199,7 +222,7 @@ class EdifyGenerator(object):
       self.script.append(
           'write_firmware_image("PACKAGE:%s", "%s");' % (fn, kind))
 
-  def WriteRawImage(self, mount_point, fn):
+  def WriteRawImage(self, mount_point, fn, start_block = 0):
     """Write the given package file into the partition for the given
     mount point."""
 
@@ -207,7 +230,10 @@ class EdifyGenerator(object):
     if fstab:
       p = fstab[mount_point]
       partition_type = common.PARTITION_TYPES[p.fs_type]
-      args = {'device': p.device, 'fn': fn}
+      if start_block > 0:
+        args = {'start_block': start_block, 'device': p.device, 'fn': fn}
+      else:
+        args = {'device': p.device, 'fn': fn}
       if partition_type == "MTD":
         self.script.append(
             ('assert(package_extract_file("%(fn)s", "/tmp/%(device)s.img"),\n'
@@ -216,6 +242,10 @@ class EdifyGenerator(object):
       elif partition_type == "EMMC":
         self.script.append(
             'package_extract_file("%(fn)s", "%(device)s");' % args)
+      elif partition_type == "BML_OVER_MTD":
+        self.UnpackPackageFile(fn, '/tmp/%s' % fn)
+        self.script.append(
+            'write_bml_over_mtd_image("/tmp/%(fn)s", "%(device)s", "%(start_block)i");' % args)
       else:
         raise ValueError("don't know how to write \"%s\" partitions" % (p.fs_type,))
 
