@@ -158,8 +158,12 @@ class EdifyGenerator(object):
       self.script.append("# " + i)
     self.script.append("")
 
-  def RunProgram(self, program):
-    self.script.append('assert(run_program("%s") == 0);' % program)
+  def RunProgram(self, program, args):
+    cmd = 'assert(run_program("%s"' % program
+    for arg in args:
+      cmd += ', "%s"' % arg
+    cmd += ') == 0);'
+    self.script.append(cmd)
 
   def Print(self, message):
     """Log a message to the screen (if the logs are visible)."""
