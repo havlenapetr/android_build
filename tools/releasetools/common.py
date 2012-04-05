@@ -837,7 +837,8 @@ def ComputeDifferences(diffs):
 
 # map recovery.fstab's fs_types to mount/format "partition types"
 PARTITION_TYPES = { "yaffs2": "MTD", "mtd": "MTD",
-                    "ext4": "EMMC", "emmc": "EMMC" }
+                    "ext4": "EMMC", "emmc": "EMMC",
+                    "bml2mtd": "BML_OVER_MTD", "bml_over_mtd": "BML_OVER_MTD" }
 
 def GetTypeAndDevice(mount_point, info):
   fstab = info["fstab"]

@@ -189,7 +189,7 @@ class EdifyGenerator(object):
     cmd = "".join(cmd)
     self.script.append(self._WordWrap(cmd))
 
-  def WriteRawImage(self, mount_point, fn):
+  def WriteRawImage(self, mount_point, fn, start_block = 0):
     """Write the given package file into the partition for the given
     mount point."""
 
@@ -197,7 +197,10 @@ class EdifyGenerator(object):
     if fstab:
       p = fstab[mount_point]
       partition_type = common.PARTITION_TYPES[p.fs_type]
-      args = {'device': p.device, 'fn': fn}
+      if start_block > 0:
+        args = {'start_block': start_block, 'device': p.device, 'fn': fn}
+      else:
+        args = {'device': p.device, 'fn': fn}
       if partition_type == "MTD":
         self.script.append(
             'write_raw_image(package_extract_file("%(fn)s"), "%(device)s");'
@@ -205,6 +208,10 @@ class EdifyGenerator(object):
       elif partition_type == "EMMC":
         self.script.append(
             'package_extract_file("%(fn)s", "%(device)s");' % args)
+      elif partition_type == "BML_OVER_MTD":
+        UnpackPackageFile(fn, '/tmp/%s' % fn)
+        self.script.append(
+            'write_bml_over_mtd_image("/tmp/%(fn)s", "%(device)s", "%(start_block)i");' % args)
       else:
         raise ValueError("don't know how to write \"%s\" partitions" % (p.fs_type,))
 
