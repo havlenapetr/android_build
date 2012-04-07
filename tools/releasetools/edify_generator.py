@@ -85,6 +85,17 @@ class EdifyGenerator(object):
     self.script.append(('assert(!less_than_int(%s, '
                         'getprop("ro.build.date.utc")));') % (timestamp,))
 
+  def AssertDevices(self, devices):
+    """Assert that the devices identifier is the given strings."""
+    cmd = 'assert('
+    for index, device in enumerate(devices):
+      cmd += ('getprop("ro.product.device") == "%s" ||\0'
+              'getprop("ro.build.product") == "%s"' % (device, device))
+      if index + 1 < len(devices):
+        cmd += ' ||\0'
+    cmd += ');'
+    self.script.append(self._WordWrap(cmd))
+
   def AssertDevice(self, device):
     """Assert that the device identifier is the given string."""
     cmd = ('assert(getprop("ro.product.device") == "%s" ||\0'
@@ -209,7 +220,7 @@ class EdifyGenerator(object):
         self.script.append(
             'package_extract_file("%(fn)s", "%(device)s");' % args)
       elif partition_type == "BML_OVER_MTD":
-        UnpackPackageFile(fn, '/tmp/%s' % fn)
+        self.UnpackPackageFile(fn, '/tmp/%s' % fn)
         self.script.append(
             'write_bml_over_mtd_image("/tmp/%(fn)s", "%(device)s", "%(start_block)i");' % args)
       else:
