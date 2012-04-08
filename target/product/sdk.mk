@@ -30,21 +30,18 @@ PRODUCT_PACKAGES := \
 	libWnnEngDic \
 	libWnnJpnDic \
 	libwnndict \
-    Phone \
+	Phone \
 	PinyinIME \
 	Protips \
 	SoftKeyboard \
 	SystemUI \
 	Launcher2 \
-	AccountAndSyncSettings \
 	Development \
 	DrmProvider \
 	Fallback \
-	GPSEnable \
 	Settings \
 	SdkSetup \
 	CustomLocale \
-	gpstest \
 	sqlite3 \
 	LatinIME \
 	CertInstaller \
@@ -84,6 +81,7 @@ PRODUCT_PACKAGES += \
 	traceview \
 	android \
 	dexdump \
+	lint \
 	monkeyrunner
 
 # Native host Java libraries that are parts of the SDK.
@@ -117,6 +115,7 @@ PRODUCT_PACKAGES += \
 	org.eclipse.jface_3.4.2.M20090107-0800 \
 	osgi \
 	layoutlib \
+	lint \
 	monkeyrunner \
 	guavalib \
 	jsr305lib \
@@ -139,6 +138,8 @@ PRODUCT_COPY_FILES := \
 	system/core/rootdir/etc/vold.fstab:system/etc/vold.fstab \
 	frameworks/base/data/sounds/effects/camera_click.ogg:system/media/audio/ui/camera_click.ogg \
 	frameworks/base/data/sounds/effects/VideoRecord.ogg:system/media/audio/ui/VideoRecord.ogg \
+	frameworks/base/data/etc/handheld_core_hardware.xml:system/etc/permissions/handheld_core_hardware.xml \
+	frameworks/base/data/etc/android.hardware.touchscreen.multitouch.jazzhand.xml:system/etc/permissions/android.hardware.touchscreen.multitouch.jazzhand.xml \
 	frameworks/base/data/etc/android.hardware.camera.autofocus.xml:system/etc/permissions/android.hardware.camera.autofocus.xml
 
 $(call inherit-product-if-exists, frameworks/base/data/fonts/fonts.mk)
