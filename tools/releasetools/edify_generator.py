@@ -234,7 +234,7 @@ class EdifyGenerator(object):
       elif partition_type == "BML_OVER_MTD":
         self.UnpackPackageFile(fn, '/tmp/%s' % fn)
         self.script.append(
-            'write_bml_over_mtd_image("%(fn)s", "%(device)s", "%(start_block)i");' % args)
+            'write_bml_over_mtd_image("/tmp/%(fn)s", "%(device)s", "%(start_block)i");' % args)
       else:
         raise ValueError("don't know how to write \"%s\" partitions" % (p.fs_type,))
 
