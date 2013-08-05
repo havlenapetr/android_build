@@ -13,6 +13,9 @@
 # limitations under the License.
 #
 
+# Don't bother with the cleanspecs if you are running mm/mmm
+ifndef ONE_SHOT_MAKEFILE
+
 INTERNAL_CLEAN_STEPS :=
 
 # Builds up a list of clean steps.  Creates a unique
@@ -97,6 +100,7 @@ clean_steps_file :=
 INTERNAL_CLEAN_STEPS :=
 INTERNAL_CLEAN_BUILD_VERSION :=
 
+endif  # ifndef ONE_SHOT_MAKEFILE
 
 # Since products and build variants (unfortunately) share the same
 # PRODUCT_OUT staging directory, things can get out of sync if different
@@ -187,7 +191,11 @@ installclean_files := \
 	$(PRODUCT_OUT)/system \
 	$(PRODUCT_OUT)/dex_bootjars \
 	$(PRODUCT_OUT)/obj/JAVA_LIBRARIES \
-	$(PRODUCT_OUT)/obj/FAKE
+	$(PRODUCT_OUT)/obj/FAKE \
+	$(PRODUCT_OUT)/obj/EXECUTABLES/adbd_intermediates \
+	$(PRODUCT_OUT)/obj/EXECUTABLES/init_intermediates \
+	$(PRODUCT_OUT)/obj/ETC/mac_permissions.xml_intermediates \
+	$(PRODUCT_OUT)/obj/ETC/sepolicy_intermediates
 
 # The files/dirs to delete during a dataclean, which removes any files
 # in the staging and emulator data partitions.

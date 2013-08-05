@@ -34,11 +34,11 @@ ifdef LOCAL_IS_HOST_MODULE
   ifneq ($(LOCAL_IS_HOST_MODULE),true)
     $(error $(LOCAL_PATH): LOCAL_IS_HOST_MODULE must be "true" or empty, not "$(LOCAL_IS_HOST_MODULE)")
   endif
-  my_prefix:=HOST_
-  my_host:=host-
+  my_prefix := HOST_
+  my_host := host-
 else
-  my_prefix:=TARGET_
-  my_host:=
+  my_prefix := TARGET_
+  my_host :=
 endif
 
 ###########################################################
@@ -50,58 +50,33 @@ endif
 #$(shell rm -f tag-list.csv)
 #tag-list-first-time := false
 #endif
-#comma := ,
-#empty :=
-#space := $(empty) $(empty)
 #$(shell echo $(lastword $(filter-out config/% out/%,$(MAKEFILE_LIST))),$(LOCAL_MODULE),$(strip $(LOCAL_MODULE_CLASS)),$(subst $(space),$(comma),$(sort $(LOCAL_MODULE_TAGS))) >> tag-list.csv)
 
 LOCAL_UNINSTALLABLE_MODULE := $(strip $(LOCAL_UNINSTALLABLE_MODULE))
 LOCAL_MODULE_TAGS := $(sort $(LOCAL_MODULE_TAGS))
 ifeq (,$(LOCAL_MODULE_TAGS))
-ifeq (true,$(LOCAL_UNINSTALLABLE_MODULE))
-LOCAL_MODULE_TAGS := optional
-else
-# Installable modules without tags fall back to user (which is changed to user eng below)
-LOCAL_MODULE_TAGS := user
+  LOCAL_MODULE_TAGS := optional
 endif
-#$(warning default tags: $(lastword $(filter-out config/% out/%,$(MAKEFILE_LIST))))
+
+# User tags are not allowed anymore.  Fail early because it will not be installed
+# like it used to be.
+ifneq ($(filter $(LOCAL_MODULE_TAGS),user),)
+  $(warning *** Module name: $(LOCAL_MODULE))
+  $(warning *** Makefile location: $(LOCAL_MODULE_MAKEFILE))
+  $(warning * )
+  $(warning * Module is attempting to use the 'user' tag.  This)
+  $(warning * used to cause the module to be installed automatically.)
+  $(warning * Now, the module must be listed in the PRODUCT_PACKAGES)
+  $(warning * section of a product makefile to have it installed.)
+  $(warning * )
+  $(error user tag detected on module.)
 endif
 
 # Only the tags mentioned in this test are expected to be set by module
 # makefiles. Anything else is either a typo or a source of unexpected
 # behaviors.
-ifneq ($(filter-out user debug eng tests optional samples shell_ash shell_mksh,$(LOCAL_MODULE_TAGS)),)
+ifneq ($(filter-out debug eng tests optional samples shell_ash shell_mksh,$(LOCAL_MODULE_TAGS)),)
 $(warning unusual tags $(LOCAL_MODULE_TAGS) on $(LOCAL_MODULE) at $(LOCAL_PATH))
-endif
-
-ifneq ($(filter $(LOCAL_MODULE_TAGS),user),)
-  ifeq ($(filter $(GRANDFATHERED_USER_MODULES),$(LOCAL_MODULE)),)
-    $(warning *** Module name: $(LOCAL_MODULE))
-    $(warning *** Makefile location: $(LOCAL_PATH))
-    $(warning * )
-    $(warning * Each module must use a LOCAL_MODULE_TAGS in its)
-    $(warning * Android.mk. Possible tags declared by a module:)
-    $(warning * )
-    $(warning *     optional, debug, eng, tests, samples)
-    $(warning * )
-    $(warning * If the module is expected to be in all builds)
-    $(warning * of a product, then it should use the)
-    $(warning * "optional" tag: )
-    $(warning * )
-    $(warning *    Add "LOCAL_MODULE_TAGS := optional" in the)
-    $(warning *    Android.mk for the affected module, and add)
-    $(warning *    the LOCAL_MODULE value for that component)
-    $(warning *    into the PRODUCT_PACKAGES section of product)
-    $(warning *    makefile(s) where it's necessary, if)
-    $(warning *    appropriate.)
-    $(warning * )
-    $(warning * If the component should be in EVERY build of ALL)
-    $(warning * products, then add its LOCAL_MODULE value to the)
-    $(warning * PRODUCT_PACKAGES section of)
-    $(warning * build/target/product/core.mk)
-    $(warning * )
-    $(error user tag detected on new module - user tags are only supported on legacy modules)
-  endif
 endif
 
 # Add implicit tags.
@@ -117,25 +92,9 @@ ifneq ($(gpl_license_file),)
   ALL_GPL_MODULE_LICENSE_FILES := $(sort $(ALL_GPL_MODULE_LICENSE_FILES) $(gpl_license_file))
 endif
 
-#
-# If this module is listed on CUSTOM_MODULES, promote it to "user"
-# so that it will be installed in $(TARGET_OUT).
-#
-ifneq (,$(filter $(LOCAL_MODULE),$(CUSTOM_MODULES)))
-  LOCAL_MODULE_TAGS := $(sort $(LOCAL_MODULE_TAGS) user)
-endif
-
 LOCAL_MODULE_CLASS := $(strip $(LOCAL_MODULE_CLASS))
 ifneq ($(words $(LOCAL_MODULE_CLASS)),1)
   $(error $(LOCAL_PATH): LOCAL_MODULE_CLASS must contain exactly one word, not "$(LOCAL_MODULE_CLASS)")
-endif
-
-# Those used to be implicitly ignored, but aren't any more.
-# As of 20100110 there are no apps with the user tag.
-ifeq ($(LOCAL_MODULE_CLASS),APPS)
-  ifneq ($(filter $(LOCAL_MODULE_TAGS),user),)
-    $(warning user tag on app $(LOCAL_MODULE) at $(LOCAL_PATH) - add your app to core.mk instead)
-  endif
 endif
 
 ifneq (true,$(LOCAL_UNINSTALLABLE_MODULE))
@@ -298,7 +257,11 @@ $(proto_java_sources_file_stamp): PRIVATE_PROTO_JAVA_OUTPUT_DIR := $(proto_java_
 ifeq ($(LOCAL_PROTOC_OPTIMIZE_TYPE),micro)
 $(proto_java_sources_file_stamp): PRIVATE_PROTO_JAVA_OUTPUT_OPTION := --javamicro_out
 else
+  ifeq ($(LOCAL_PROTOC_OPTIMIZE_TYPE),nano)
+$(proto_java_sources_file_stamp): PRIVATE_PROTO_JAVA_OUTPUT_OPTION := --javanano_out
+  else
 $(proto_java_sources_file_stamp): PRIVATE_PROTO_JAVA_OUTPUT_OPTION := --java_out
+  endif
 endif
 $(proto_java_sources_file_stamp): PRIVATE_PROTOC_FLAGS := $(LOCAL_PROTOC_FLAGS)
 $(proto_java_sources_file_stamp) : $(proto_sources_fullpath) $(PROTOC)
@@ -439,6 +402,20 @@ endif # !LOCAL_IS_HOST_MODULE
 full_java_libs += $(full_static_java_libs) $(LOCAL_CLASSPATH)
 full_java_lib_deps += $(full_static_java_libs) $(LOCAL_CLASSPATH)
 
+# This is set by packages that are linking to other packages that export
+# shared libraries, allowing them to make use of the code in the linked apk.
+LOCAL_APK_LIBRARIES := $(strip $(LOCAL_APK_LIBRARIES))
+ifdef LOCAL_APK_LIBRARIES
+  link_apk_libraries := \
+      $(foreach lib,$(LOCAL_APK_LIBRARIES), \
+        $(call intermediates-dir-for, \
+              APPS,$(lib),,COMMON)/classes.jar)
+
+  # link against the jar with full original names (before proguard processing).
+  full_java_libs += $(link_apk_libraries)
+  full_java_lib_deps += $(link_apk_libraries)
+endif
+
 # This is set by packages that contain instrumentation, allowing them to
 # link against the package they are instrumenting.  Currently only one such
 # package is allowed.
@@ -476,10 +453,9 @@ endif
 cleantarget := clean-$(LOCAL_MODULE)
 $(cleantarget) : PRIVATE_MODULE := $(LOCAL_MODULE)
 $(cleantarget) : PRIVATE_CLEAN_FILES := \
-		$(PRIVATE_CLEAN_FILES) \
-		$(LOCAL_BUILT_MODULE) \
-		$(LOCAL_INSTALLED_MODULE) \
-		$(intermediates)
+    $(LOCAL_BUILT_MODULE) \
+    $(LOCAL_INSTALLED_MODULE) \
+    $(intermediates)
 $(cleantarget)::
 	@echo "Clean: $(PRIVATE_MODULE)"
 	$(hide) rm -rf $(PRIVATE_CLEAN_FILES)
@@ -488,9 +464,23 @@ $(cleantarget)::
 ## Common definitions for module.
 ###########################################################
 
+# aapt doesn't accept multiple --extra-packages flags.
+# We have to collapse them into a single --extra-packages flag here.
+LOCAL_AAPT_FLAGS := $(strip $(LOCAL_AAPT_FLAGS))
+ifdef LOCAL_AAPT_FLAGS
+ifeq ($(filter 0 1,$(words $(filter --extra-packages,$(LOCAL_AAPT_FLAGS)))),)
+aapt_flags := $(subst --extra-packages$(space),--extra-packages@,$(LOCAL_AAPT_FLAGS))
+aapt_flags_extra_packages := $(patsubst --extra-packages@%,%,$(filter --extra-packages@%,$(aapt_flags)))
+aapt_flags_extra_packages := $(sort $(subst :,$(space),$(aapt_flags_extra_packages)))
+LOCAL_AAPT_FLAGS := $(filter-out --extra-packages@%,$(aapt_flags)) \
+    --extra-packages $(subst $(space),:,$(aapt_flags_extra_packages))
+aapt_flags_extra_packages :=
+aapt_flags :=
+endif
+endif
+
 # Propagate local configuration options to this target.
 $(LOCAL_INTERMEDIATE_TARGETS) : PRIVATE_PATH:=$(LOCAL_PATH)
-$(LOCAL_INTERMEDIATE_TARGETS) : PRIVATE_POST_PROCESS_COMMAND:= $(LOCAL_POST_PROCESS_COMMAND)
 $(LOCAL_INTERMEDIATE_TARGETS) : PRIVATE_AAPT_FLAGS:= $(LOCAL_AAPT_FLAGS)
 $(LOCAL_INTERMEDIATE_TARGETS) : PRIVATE_JAVA_LIBRARIES:= $(LOCAL_JAVA_LIBRARIES)
 $(LOCAL_INTERMEDIATE_TARGETS) : PRIVATE_MANIFEST_PACKAGE_NAME:= $(LOCAL_MANIFEST_PACKAGE_NAME)
@@ -524,10 +514,12 @@ ifndef LOCAL_UNINSTALLABLE_MODULE
   # Define a copy rule to install the module.
   # acp and libraries that it uses can't use acp for
   # installation;  hence, LOCAL_ACP_UNAVAILABLE.
+$(LOCAL_INSTALLED_MODULE): PRIVATE_POST_INSTALL_CMD := $(LOCAL_POST_INSTALL_CMD)
 ifneq ($(LOCAL_ACP_UNAVAILABLE),true)
 $(LOCAL_INSTALLED_MODULE): $(LOCAL_BUILT_MODULE) | $(ACP)
 	@echo "Install: $@"
 	$(copy-file-to-new-target)
+	$(PRIVATE_POST_INSTALL_CMD)
 else
 $(LOCAL_INSTALLED_MODULE): $(LOCAL_BUILT_MODULE)
 	@echo "Install: $@"
@@ -543,7 +535,6 @@ $(installed_odex) : $(built_odex) | $(ACP)
 
 $(LOCAL_INSTALLED_MODULE) : $(installed_odex)
 endif
-
 endif # !LOCAL_UNINSTALLABLE_MODULE
 
 
@@ -552,12 +543,17 @@ endif # !LOCAL_UNINSTALLABLE_MODULE
 ###########################################################
 
 # If nobody has defined a more specific module for the
-# checked modules, use LOCAL_BUILT_MODULE.  This was old
-# behavior, so it should be a safe default.
+# checked modules, use LOCAL_BUILT_MODULE.
 ifndef LOCAL_CHECKED_MODULE
-  ifndef LOCAL_SDK_VERSION
-    LOCAL_CHECKED_MODULE := $(LOCAL_BUILT_MODULE)
-  endif
+  LOCAL_CHECKED_MODULE := $(LOCAL_BUILT_MODULE)
+endif
+
+need_compile_java :=
+ifdef java_alternative_checked_module
+ifneq (,$(strip $(all_java_sources)$(full_static_java_libs))$(filter true,$(LOCAL_SOURCE_FILES_ALL_GENERATED)))
+  need_compile_java := true
+  LOCAL_CHECKED_MODULE := $(java_alternative_checked_module)
+endif
 endif
 
 # If they request that this module not be checked, then don't.
@@ -586,16 +582,18 @@ ALL_MODULES.$(LOCAL_MODULE).CHECKED := \
 ALL_MODULES.$(LOCAL_MODULE).BUILT := \
     $(ALL_MODULES.$(LOCAL_MODULE).BUILT) $(LOCAL_BUILT_MODULE)
 ALL_MODULES.$(LOCAL_MODULE).INSTALLED := \
-    $(ALL_MODULES.$(LOCAL_MODULE).INSTALLED) $(LOCAL_INSTALLED_MODULE)
+    $(strip $(ALL_MODULES.$(LOCAL_MODULE).INSTALLED) $(LOCAL_INSTALLED_MODULE))
 ALL_MODULES.$(LOCAL_MODULE).REQUIRED := \
     $(ALL_MODULES.$(LOCAL_MODULE).REQUIRED) $(LOCAL_REQUIRED_MODULES)
 ALL_MODULES.$(LOCAL_MODULE).EVENT_LOG_TAGS := \
     $(ALL_MODULES.$(LOCAL_MODULE).EVENT_LOG_TAGS) $(event_log_tags)
 ALL_MODULES.$(LOCAL_MODULE).INTERMEDIATE_SOURCE_DIR := \
     $(ALL_MODULES.$(LOCAL_MODULE).INTERMEDIATE_SOURCE_DIR) $(LOCAL_INTERMEDIATE_SOURCE_DIR)
+ALL_MODULES.$(LOCAL_MODULE).MAKEFILE := \
+    $(ALL_MODULES.$(LOCAL_MODULE).MAKEFILE) $(LOCAL_MODULE_MAKEFILE)
 ifdef LOCAL_MODULE_OWNER
 ALL_MODULES.$(LOCAL_MODULE).OWNER := \
-    $(strip $(ALL_MODULES.$(LOCAL_MODULE).OWNER) $(LOCAL_MODULE_OWNER))
+    $(sort $(ALL_MODULES.$(LOCAL_MODULE).OWNER) $(LOCAL_MODULE_OWNER))
 endif
 
 INSTALLABLE_FILES.$(LOCAL_INSTALLED_MODULE).MODULE := $(LOCAL_MODULE)
@@ -612,17 +610,41 @@ ALL_MODULE_TAGS := $(sort $(ALL_MODULE_TAGS) $(LOCAL_MODULE_TAGS))
 # it will default to recursive expansion.
 $(foreach tag,$(LOCAL_MODULE_TAGS),\
     $(eval ALL_MODULE_TAGS.$(tag) := \
-	    $(ALL_MODULE_TAGS.$(tag)) \
-	    $(LOCAL_INSTALLED_MODULE)))
+        $(ALL_MODULE_TAGS.$(tag)) \
+        $(LOCAL_INSTALLED_MODULE)))
 
 # Add this module name to the tag list of each specified tag.
 $(foreach tag,$(LOCAL_MODULE_TAGS),\
     $(eval ALL_MODULE_NAME_TAGS.$(tag) += $(LOCAL_MODULE)))
 
 ###########################################################
+## umbrella targets used to verify builds
+###########################################################
+j_or_n :=
+ifneq (,$(filter EXECUTABLES SHARED_LIBRARIES STATIC_LIBRARIES,$(LOCAL_MODULE_CLASS)))
+j_or_n := native
+else
+ifneq (,$(filter JAVA_LIBRARIES APPS,$(LOCAL_MODULE_CLASS)))
+j_or_n := java
+endif
+endif
+ifdef LOCAL_IS_HOST_MODULE
+h_or_t := host
+else
+h_or_t := target
+endif
+
+ifdef j_or_n
+$(j_or_n) $(h_or_t) $(j_or_n)-$(h_or_t) : $(LOCAL_CHECKED_MODULE)
+ifneq (,$(filter $(LOCAL_MODULE_TAGS),tests))
+$(j_or_n)-$(h_or_t)-tests $(j_or_n)-tests $(h_or_t)-tests : $(LOCAL_CHECKED_MODULE)
+endif
+endif
+
+###########################################################
 ## NOTICE files
 ###########################################################
 
-include $(BUILD_SYSTEM)/notice_files.mk
+include $(BUILD_NOTICE_FILE)
 
 #:vi noexpandtab
